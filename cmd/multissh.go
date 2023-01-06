@@ -108,6 +108,7 @@ func main() {
 			ccons := make(chan struct{}, *cons)
 			wg := &sync.WaitGroup{}
 			run.ServersRun(cmd, puser, wg, cr, *ipFile, ccons, *psafe, *ptimeout)
+			wg.Wait()
 		}
 	default:
 		usage()

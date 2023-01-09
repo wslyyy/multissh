@@ -110,6 +110,27 @@ func main() {
 			run.ServersRun(cmd, puser, wg, cr, *ipFile, ccons, *psafe, *ptimeout)
 			wg.Wait()
 		}
+	case "push":
+		if flag.NArg() != 2 {
+			usage()
+			return
+		}
+
+		src := flag.Arg(0)
+		dst := flag.Arg(1)
+		log.Info("multissh -t=push local-file=%s, remote-path=%s", src, dst)
+
+		puser := run.NewUser(*user, *port, *pwd, *sshPrivateKeyPath, *force, *encFlag)
+		if *host != "" {
+			log.Info("[servers]=%s", *host)
+			run.SinglePush(*host, src, dst, puser, *force, *ptimeout)
+		} else {
+			cr := make(chan machine.Result)
+			ccons := make(chan struct{}, *cons)
+			wg := &sync.WaitGroup{}
+			run.ServersPush(src, dst, puser, wg, cr, *ipFile, ccons, *ptimeout)
+			wg.Wait()
+		}
 	default:
 		usage()
 	}

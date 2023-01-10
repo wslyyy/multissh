@@ -41,3 +41,16 @@ func PrintResults2(crs chan machine.Result, ls int, wt *sync.WaitGroup, ccons ch
 		<-ccons
 	}
 }
+
+func PrintPullResult(ip, src, dst string, err error) {
+	fmt.Println("ip=", ip)
+	fmt.Println("command=", "scp "+"root@"+ip+":"+dst+" "+src)
+	if err != nil {
+		fmt.Printf("return=1\n")
+		fmt.Println(err)
+	} else {
+		fmt.Printf("return=0\n")
+		fmt.Printf("Pull from %s to %s ok.\n", dst, src)
+	}
+	fmt.Println("--------------------------------------------------")
+}

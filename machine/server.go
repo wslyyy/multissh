@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"multissh/auth"
 	"multissh/logs"
+	"multissh/pull"
 	"multissh/push"
 	"multissh/tools"
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -27,8 +29,8 @@ var (
 
 const (
 	NO_EXIST = "0"
-	IS_FILE = "1"
-	IS_DIR = "2"
+	IS_FILE  = "1"
+	IS_DIR   = "2"
 )
 
 type Server struct {
@@ -79,17 +81,38 @@ func NewPushServer(ip, port, user, pwd, sshPrivateKeyPath, action, file, rpath s
 	rfile := path.Join(rpath, path.Base(file))
 	cmd := createShell(rfile)
 	server := &Server{
-		Ip: ip,
-		Port: port,
-		User: user,
-		Pwd: pwd,
+		Ip:                ip,
+		Port:              port,
+		User:              user,
+		Pwd:               pwd,
 		sshPrivateKeyPath: sshPrivateKeyPath,
-		Action: action,
-		FileName: file,
-		RemotePath: rpath,
-		Cmd: cmd,
-		Force: force,
-		Timeout: timeout,
+		Action:            action,
+		FileName:          file,
+		RemotePath:        rpath,
+		Cmd:               cmd,
+		Force:             force,
+		Timeout:           timeout,
+	}
+	if pwd == "" {
+		server.SetPwd()
+	}
+	return server
+}
+
+func NewPullServer(ip, port, user, pwd, sshPrivateKeyPath, action, file, rpath string, force bool, timeout int) *Server {
+	cmd := createShell(rpath)
+	server := &Server{
+		Ip:                ip,
+		Port:              port,
+		User:              user,
+		Pwd:               pwd,
+		sshPrivateKeyPath: sshPrivateKeyPath,
+		Action:            action,
+		FileName:          file,
+		RemotePath:        rpath,
+		Cmd:               cmd,
+		Force:             force,
+		Timeout:           timeout,
 	}
 	if pwd == "" {
 		server.SetPwd()
@@ -269,10 +292,25 @@ func (s *Server) PRunCmd_With_Private_Key(crs chan Result) {
 func (s *Server) PRunPushChoose(mode string, crs chan Result) {
 	cmd := "push " + s.FileName + " to " + s.Ip + ":" + s.RemotePath
 	rs := Result{
-		Ip: s.Ip,
+		Ip:  s.Ip,
 		Cmd: cmd,
 	}
 	result := s.RunPushDir(mode)
+	if result != nil {
+		rs.Err = result
+	} else {
+		rs.Result = cmd + " ok\n"
+	}
+	crs <- rs
+}
+
+func (s *Server) PRunPullChoose(mode string, crs chan Result) {
+	cmd := "pull " + s.Ip + ":" + s.RemotePath + " to local dir <" + s.FileName + ">"
+	rs := Result{
+		Ip:  s.Ip,
+		Cmd: cmd,
+	}
+	result := s.RunPull(mode)
 	if result != nil {
 		rs.Err = result
 	} else {
@@ -319,6 +357,67 @@ func (s *Server) RunPushDir(mode string) (err error) {
 		return err
 	}
 	err = push.PushFile(filename, s.RemotePath)
+	return err
+}
+
+func (s *Server) RunPull(mode string) (err error) {
+	// 判断远程文件情况
+	re := strings.TrimSpace(s.checkRemoteFile(mode))
+	log.Debug("server.checkRemoteFile()=%s\n", re)
+
+	// 不存在报错
+	if re == NO_EXIST {
+		errString := "Remote Server's " + s.RemotePath + " doesn't exist.\n"
+		return errors.New(errString)
+	}
+
+	// 不支持拉取目录
+	if re == IS_DIR {
+		errString := "Remote Server's " + s.RemotePath + " is a directory, not support.\n"
+		return errors.New(errString)
+	}
+
+	// 如果不是普通文件，异常
+	if re != IS_FILE {
+		errString := "Get info from Remote Server's " + s.RemotePath + " error.\n"
+		return errors.New(errString)
+	}
+
+	// 本地目录
+	dst := s.FileName
+	// 远程文件
+	src := s.RemotePath
+	log.Debug("src=%s", src)
+	log.Debug("dst=%s", dst)
+
+	// 本地路径不存在就自动创建
+	err = tools.MakePath(dst)
+	if err != nil {
+		return err
+	}
+
+	// 检查本地是否有同名文件
+	fileName := filepath.Base(dst)
+	localFile := filepath.Join(dst, fileName)
+
+	flag := tools.FileExists(localFile)
+	log.Debug("flag=%v", flag)
+	log.Debug("localFile=%s", localFile)
+
+	// -f强制覆盖
+	if flag && !s.Force {
+		return errors.New(localFile + " is exist, use -f to cover the old file.\n")
+	}
+
+	// 执行
+	client, err := s.getSSH(mode)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	pull := pull.NewPull(client)
+	err = pull.PullFile(dst, src)
 	return err
 }
 

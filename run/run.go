@@ -7,6 +7,7 @@ import (
 	"multissh/logs"
 	"multissh/machine"
 	"multissh/output"
+	"path/filepath"
 	"sync"
 )
 
@@ -34,12 +35,53 @@ func NewUser(user, port, pwd, sshPrivateKeyPath string, force, encflag bool) *Co
 	}
 }
 
+func SinglePull(host string, cu *CommonUser, src, dst string, timeout int) {
+	server := machine.NewPullServer(host, cu.port, cu.user, cu.pwd, cu.sshPrivateKeyPath, "pull", src, dst, cu.force, timeout)
+	var mode string
+	if cu.sshPrivateKeyPath != "" {
+		mode = "K"
+	} else {
+		mode = "P"
+	}
+	err := server.RunPull(mode)
+	output.PrintPullResult(host, src, dst, err)
+}
+
+func ServerPull(src, dst string, cu *CommonUser, wt *sync.WaitGroup, crs chan machine.Result, ipFile string, ccons chan struct{}, timeout int) {
+	hosts, err := parseIpfile(ipFile, cu)
+	if err != nil {
+		log.Error("Parse %s error, error=%s", ipFile, err)
+		return
+	}
+	ips := config.GetIps(hosts)
+	log.Info("[servers]=%v", ips)
+	fmt.Printf("[servers]=%v\n", ips)
+
+	ls := len(hosts)
+	go output.PrintResults2(crs, ls, wt, ccons, timeout)
+
+	for _, h := range hosts {
+		ip := h.Ip
+		localPath := filepath.Join(src, ip)
+		ccons <- struct{}{}
+		server := machine.NewPullServer(h.Ip, h.Port, h.User, h.Pwd, h.SshPrivateKeyPath, "pull", localPath, dst, cu.force, timeout)
+		wt.Add(1)
+		var mode string
+		if h.SshPrivateKeyPath == "" {
+			mode = "P"
+		} else {
+			mode = "K"
+		}
+		go server.PRunPullChoose(mode, crs)
+	}
+}
+
 func SinglePush(host, src, dst string, cu *CommonUser, force bool, timeout int) {
 	server := machine.NewPushServer(host, cu.port, cu.user, cu.pwd, cu.sshPrivateKeyPath, "push", src, dst, force, timeout)
 	cmd := "push " + server.FileName + " to " + server.Ip + ":" + server.RemotePath
 
 	rs := machine.Result{
-		Ip: server.Ip,
+		Ip:  server.Ip,
 		Cmd: cmd,
 	}
 	var mode string

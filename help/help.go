@@ -11,18 +11,25 @@ DESCRIPTION
 USAGE
 	1.Single Mode
 		remote-comand:
-		multissh -t cmd  -h host -P port(default 22) -u user(default root) -p passswrod [-f] command 
+		multissh -t cmd(default cmd)  -h host -P port(default 22) -u user(default root) [-p passswrod] [-K privateSSHKeyPath] [-f] command 
 		Files-transfer:   
 		<push file>   
-		multissh -t push  -h host -P port(default 22) -u user(default root) -p passswrod [-f] localfile  remotepath 
+		multissh -t push  -h host -P port(default 22) -u user(default root) -p [-p passswrod] [-K privateSSHKeyPath] [-f] localfile  remotepath 
 		<pull file> 
-		multissh -t pull -h host -P port(default 22) -u user(default root) -p passswrod [-f] remotefile localpath 
+		multissh -t pull -h host -P port(default 22) -u user(default root) -p [-p passswrod] [-K privateSSHKeyPath] [-f] remotefile localpath 
 	2.Batch Mode
 		Ssh-comand:
-		multissh -t cmd -i ip_filename -P port(default 22) -u user(default root) -p passswrod [-f] command 
+		multissh -t cmd(default cmd) -i ipFilePath -P port(default 22) -u user(default root) -p passswrod [-f] command 
 		Files-transfer:   
-		multissh -t push -i ip_filename -P port(default 22) -u user(default root) -p passswrod [-f] localfile  remotepath 
-		multissh -t pull -i ip_filename -P port(default 22) -u user(default root) -p passswrod [-f] remotefile localpath
+		multissh -t push -i ipFilePath -P port(default 22) -u user(default root) [-f] localfile  remotepath 
+		multissh -t pull -i ipFilePath -P port(default 22) -u user(default root) [-f] remotefile localpath
+IPFILE
+	Create ipfile.txt, Every line is like:
+		mode[k/p]|host|port|user|[privateSSHKeyPath][password]
+	example:
+		p|192.168.88.36|22|root|PWD!123456
+		k|192.168.88.26|22|root|/root/.ssh/a.key
+		k|192.168.88.16|22|root|/root/.ssh/b.key
 EMAIL
-    	wusiyuan@lollitech.com 
+    	wusiyuan@lollitech.com
 `
